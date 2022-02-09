@@ -2,6 +2,7 @@ package ldbclone
 
 import (
 	"errors"
+	"sort"
 )
 
 var ErrKeyNotFound = errors.New("key not found")
@@ -33,6 +34,7 @@ func (m *Memtable) Has(key []byte) (bool, error) {
 func (m *Memtable) Put(key, value []byte) error {
 	m.store[string(key)] = value
 	m.keys = append(m.keys, string(key))
+	sort.Strings(m.keys)
 
 	return nil
 }
@@ -56,7 +58,12 @@ func (m *Memtable) Delete(key []byte) error {
 //  Returns an Iterator (see below) for scanning through all key-value pairs in the given
 //  range, ordered by key ascending.
 func (m *Memtable) RangeScan(start, limit []byte) (Iterator, error) {
-	return nil, nil
+	idxStart := 0
+	idxEnd := len(m.keys)
+
+	iterator := NewMemtableIterator(m, m.keys[idxStart:idxEnd])
+
+	return iterator, nil
 }
 
 func NewMemtable() *Memtable {
@@ -69,9 +76,8 @@ func NewMemtable() *Memtable {
 // Used to iterate through values in a specified range in a memtable
 type MemtableIterator struct {
 	Idx        int64
-	RangeStart int64
-	RangeENd   int64
 	Memtable   *Memtable
+	IndexSlice []string
 	Finished   bool
 }
 
@@ -79,7 +85,7 @@ type MemtableIterator struct {
 func (i *MemtableIterator) Next() bool {
 	if i.Finished {
 		return false
-	} else if i.Idx == int64(len(i.Memtable.keys)-1) {
+	} else if i.Idx == int64(len(i.IndexSlice)-1) {
 		i.Finished = true
 		return false
 	}
@@ -99,22 +105,24 @@ func (i *MemtableIterator) Key() []byte {
 	if i.Finished {
 		return nil
 	}
-	return []byte(i.Memtable.keys[i.Idx])
+	return []byte(i.IndexSlice[i.Idx])
 }
 
-// Value returns the value of the current key/value pair, or nil if done.
+// Value returns the value of the current key/value pair for the iterator, or nil if done.
 func (i *MemtableIterator) Value() []byte {
 	if i.Finished {
 		return nil
 	}
-	key := i.Memtable.keys[i.Idx]
+	key := i.IndexSlice[i.Idx]
 	return i.Memtable.store[key]
 }
 
-func NewMemtableIterator(m *Memtable) *MemtableIterator {
+func NewMemtableIterator(m *Memtable, s []string) *MemtableIterator {
 	i := &MemtableIterator{
-		Idx:      0,
-		Memtable: m,
+		Idx:        0,
+		Memtable:   m,
+		IndexSlice: s,
+		Finished:   false,
 	}
 
 	return i

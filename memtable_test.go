@@ -123,10 +123,11 @@ func TestMemtable_Delete(t *testing.T) {
 		key []byte
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
+		name     string
+		fields   fields
+		args     args
+		wantErr  bool
+		expected map[string][]byte
 	}{
 		{
 			name: "Deleting item that is present",
@@ -136,7 +137,8 @@ func TestMemtable_Delete(t *testing.T) {
 			args: args{
 				key: []byte("dog"),
 			},
-			wantErr: false,
+			wantErr:  false,
+			expected: map[string][]byte{},
 		},
 		{
 			name: "Deleting item that is not present",
@@ -146,7 +148,8 @@ func TestMemtable_Delete(t *testing.T) {
 			args: args{
 				key: []byte("cat"),
 			},
-			wantErr: true,
+			wantErr:  true,
+			expected: map[string][]byte{"dog": []byte("3")},
 		},
 	}
 	for _, tt := range tests {
@@ -156,6 +159,56 @@ func TestMemtable_Delete(t *testing.T) {
 			}
 			if err := m.Delete(tt.args.key); (err != nil) != tt.wantErr {
 				t.Errorf("Memtable.Delete() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if match := reflect.DeepEqual(m.store, tt.expected); !match {
+				t.Errorf("Memtable.Delete() test failed \nWanted: %v \nGot: %v", m.store, tt.expected)
+			}
+		})
+	}
+}
+
+// Test both that Put doesn't return an error, and that the map has the values expcted after the
+// operation
+func TestMemtable_Put(t *testing.T) {
+	type fields struct {
+		keys  []string
+		store map[string][]byte
+	}
+	type args struct {
+		key   []byte
+		value []byte
+	}
+	tests := []struct {
+		name     string
+		fields   fields
+		args     args
+		wantErr  bool
+		expected map[string][]byte
+	}{
+		{
+			name: "Putting in a single value",
+			fields: fields{
+				store: map[string][]byte{},
+			},
+			args: args{
+				key:   []byte("dog"),
+				value: []byte("3"),
+			},
+			wantErr:  false,
+			expected: map[string][]byte{"dog": []byte("3")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &Memtable{
+				keys:  tt.fields.keys,
+				store: tt.fields.store,
+			}
+			if err := m.Put(tt.args.key, tt.args.value); (err != nil) != tt.wantErr {
+				t.Errorf("Memtable.Put() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if match := reflect.DeepEqual(m.store, tt.expected); !match {
+				t.Errorf("Memtable.Delete() test failed \nWanted: %v \nGot: %v", m.store, tt.expected)
 			}
 		})
 	}
