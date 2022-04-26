@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sort"
 )
-
+ 
 var ErrKeyNotFound = errors.New("key not found")
 
 type Memtable struct {
